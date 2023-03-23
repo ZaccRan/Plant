@@ -4,19 +4,19 @@
  * Author:Zacc R
  * Date:March 17 2023
  */
+#include <Adafruit_BME280.h>
 #include <Adafruit_MQTT.h>
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 #include "Adafruit_MQTT/Adafruit_MQTT.h"
 #include "credentials.h"
 #include "HX711.h"
-#include <Adafruit_BME280.h>
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 #define OLED_RESET D4
-Adafruit_SSD1306 display(OLED_RESET);
 #define XPOS 0
 #define YPOS 1
 #define DELTAY 2                      //OLED
+Adafruit_SSD1306 display(OLED_RESET);
 Adafruit_BME280 bme;
 HX711 myScale(A3,A4);  //(DT,SCK) position matters
 SYSTEM_MODE(AUTOMATIC);   // needs auto to publish
@@ -29,24 +29,23 @@ Adafruit_MQTT_Publish pubFeed3 = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/fee
 Adafruit_MQTT_Publish pubFeedF = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/temp");
 Adafruit_MQTT_Publish pubFeedH = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/humid");
 Adafruit_MQTT_Publish pubFeedM = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/press");
-
-unsigned int last,lastTime;
-int inHg,humidRH,pressPA,tempF,tempC;
+Adafruit_MQTT_Publish pubFeedW = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/weight");
+void Pump();
+void Duster();
 void MQTT_connect();
 bool MQTT_ping();
+unsigned int last,lastTime;
+int inHg,humidRH,pressPA,tempF,tempC;
 bool status;
 int z,y,x;
-
 const int DUST=D6;
 const int MOIST=A2;
 const int AIR=A0;
 const int RELAY=D8;
-
 const int CAL_FACTOR=368; //368 is really close to Grams
 const int SAMPLES=10; // number of data points averaged when using get_units or get_value
 float weight,rawData,calibration;
 int offset,subFeedValue;
-
 unsigned long duration;
 unsigned long starttime;
 unsigned long sampletime_ms = 30000;//sampe 30s ;
@@ -62,9 +61,9 @@ void setup() {
   // Serial.begin(9600);
   Wire.begin();
   WiFi.connect(); // Connect to internet , but not Particle Cloud
-  // while ( WiFi . connecting () ) {
-  // Serial . printf (".");
-  //   }
+    while ( WiFi . connecting () ) {
+      Serial . printf (".");
+     }
   status=bme.begin(0x76);
   // if(status==false){
   //     Serial.printf("BME280 at address 0x%02X failed to start\n", 0x76);
@@ -72,12 +71,10 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
   display.display();
-
   myScale.set_scale(); // initialize loadcell
   delay (5000); // let the loadcell settle
   myScale.tare(); // set the tare weight (or zero )
   myScale.set_scale (CAL_FACTOR); // adjust when calibrating scale to desired units
-
   mqtt.subscribe(&subFeed);
 }
 
@@ -121,12 +118,13 @@ void loop() {
       pubFeedF.publish(tempF);
       pubFeedH.publish(humidRH);
       pubFeedM.publish(inHg);
+      pubFeedW.publish(weight);
       }
     lastTime = millis();
     }
   y=concentration;
   display.clearDisplay();
-  display.display();
+  // display.display();
   weight=myScale.get_units(SAMPLES); // return weight in units set by set_scale ();
   display.setRotation(1);
   display.setTextSize(1);
@@ -135,12 +133,11 @@ void loop() {
   display.printf("Soil %i\n\nDust %i\n\nAirQuality%i\n\nTemp %uF\n\nPress %u\n\nHumid %u\n\n%0.1f g\n",x,y,z,tempF,inHg,humidRH,weight);
   display.display();
   // delay(250);
-
   // rawData = myScale . get_value ( SAMPLES ) ;// returns raw loadcell reading minus offset
   // offset = myScale . get_offset () ; // returns the offset set by tare ();
   // calibration = myScale . get_scale () ;
-
 }
+
 void MQTT_connect() {
   int8_t ret;
   // Return if already connected.
@@ -170,7 +167,7 @@ bool MQTT_ping() {
 void Pump() {
   digitalWrite(RELAY,HIGH);
   // Serial.printf("Pump is ON \n");
-  delay(500);
+  delay(400);
   digitalWrite(RELAY,LOW);
   // Serial.printf("Pump is OFF \n");
 }
